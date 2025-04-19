@@ -172,3 +172,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+/logs/
+/migrations/
+.idea/
+**/__pycache__/
+gunicorn_config_python_IM_dev.py
+restart.sh
+/file_save/
+tmp*

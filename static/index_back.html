@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chat BI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #chat {
+            height: 300px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        #input {
+            width: 70%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .user {
+            color: #2196F3;
+            margin: 5px 0;
+        }
+        .ai {
+            color: #4CAF50;
+            margin: 5px 0;
+        }
+        .status {
+            color: #777;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat BI</h1>
+    <div id="chat"></div>
+    <input id="input" placeholder="输入消息..." autocomplete="off">
+    <button id="send">发送</button>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+
+        // WebSocket连接配置
+        const ws = new WebSocket('ws://localhost:8008/ws');
+
+        // 连接事件
+        ws.onopen = () => {
+            addMessage('系统', '已连接到服务器', 'system');
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket错误:', error);
+        };
+
+        ws.onclose = () => {
+        };
+
+        // 消息处理
+        ws.onmessage = (event) => {
+            addMessage('AI', event.data, 'ai');
+        };
+
+        // 发送消息
+        function sendMessage() {
+            const message = input.value.trim();
+            if (message && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                addMessage('你', message, 'user');
+                input.value = '';
+            }
+        }
+
+        // 添加消息到聊天框
+        function addMessage(sender, text, type) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = type;
+            msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chat.appendChild(msgDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // 事件绑定
+        sendBtn.addEventListener('click', sendMessage);
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // 初始禁用按钮直到连接建立
+        sendBtn.disabled = true;
+        ws.onopen = () => {
+            sendBtn.disabled = false;
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Chat BI</title>
+    <!-- 引入ECharts库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        margin: 0;
+        padding: 20px;
+        height: 100vh;
+      }
+
+      #chat-container {
+        width: 40%;
+        border-right: 1px solid #ddd;
+        padding-right: 20px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #chat {
+        flex-grow: 1;
+        border: 1px solid #ddd;
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        background: #f9f9f9;
+      }
+
+      #chart-container {
+        width: 60%;
+        padding-left: 20px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #chart {
+        flex-grow: 1;
+        min-height: 400px;
+      }
+
+      #input-area {
+        display: flex;
+        margin-top: 10px;
+      }
+
+      #input {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      #send {
+        padding: 8px 15px;
+        margin-left: 10px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .user {
+        color: #2196F3;
+        margin: 5px 0;
+      }
+
+      .ai {
+        color: #4CAF50;
+        margin: 5px 0;
+      }
+
+      .system {
+        color: #777;
+        font-size: 0.9em;
+        margin: 5px 0;
+      }
+
+      .status {
+        color: #777;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="chat-container">
+      <h1>Chat BI</h1>
+      <div id="chat"></div>
+      <div id="input-area">
+        <input id="input" placeholder="输入消息..." autocomplete="off">
+        <button id="send">发送</button>
+      </div>
+    </div>
+
+    <div id="chart-container">
+      <h1>数据可视化</h1>
+      <div id="chart"></div>
+    </div>
+
+    <script>
+        // 初始化元素
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+        const chartDom = document.getElementById('chart');
+
+        // 初始化图表
+        const myChart = echarts.init(chartDom);
+        myChart.setOption({
+            title: {
+                text: '等待数据...',
+                left: 'center'
+            },
+            tooltip: {},
+            xAxis: {
+                data: []
+            },
+            yAxis: {},
+            series: []
+        });
+
+        // WebSocket连接配置
+        const ws = new WebSocket('ws://localhost:8008/ws');
+
+        // 连接事件
+        ws.onopen = () => {
+            addMessage('系统', '已连接到服务器', 'system');
+            sendBtn.disabled = false;
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket错误:', error);
+            addMessage('系统', '连接出错: ' + error, 'system');
+        };
+
+        ws.onclose = () => {
+            addMessage('系统', '连接已关闭', 'system');
+        };
+
+        // 消息处理
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+
+                // 检查是否是图表数据
+                if (data.chartData && data.chartData.expectedInterest && data.chartData.actualInterestReceived) {
+                    updateChart(data);
+                    addMessage('系统', '已更新图表数据', 'system');
+                } else {
+                    // 普通文本消息
+                    addMessage('AI', event.data, 'ai');
+                }
+            } catch (e) {
+                // 非JSON消息或解析失败
+                addMessage('AI', event.data, 'ai');
+            }
+        };
+
+        // 更新图表函数
+        function updateChart(data) {
+            const expectedData = data.chartData.expectedInterest.map(item => item.value);
+            const actualData = data.chartData.actualInterestReceived.map(item => item.value);
+            const dates = data.chartData.expectedInterest.map(item => item.date);
+
+            // 柱状图
+            // const option = {
+            //     title: {
+            //         text: '预期利息 vs 实际利息',
+            //         left: 'center'
+            //     },
+            //     tooltip: {
+            //         trigger: 'axis',
+            //         axisPointer: {
+            //             type: 'shadow'
+            //         },
+            //         formatter: function(params) {
+            //             let result = params[0].name + '<br>';
+            //             params.forEach(param => {
+            //                 result += `${param.seriesName}: ${param.value.toLocaleString()}<br>`;
+            //             });
+            //             return result;
+            //         }
+            //     },
+            //     legend: {
+            //         data: ['预期利息', '实际利息'],
+            //         top: 30
+            //     },
+            //     grid: {
+            //         left: '3%',
+            //         right: '4%',
+            //         bottom: '3%',
+            //         containLabel: true
+            //     },
+            //     xAxis: {
+            //         type: 'category',
+            //         data: dates,
+            //         axisLabel: {
+            //             rotate: 30
+            //         }
+            //     },
+            //     yAxis: {
+            //         type: 'value',
+            //         axisLabel: {
+            //             formatter: function(value) {
+            //                 return value.toLocaleString();
+            //             }
+            //         }
+            //     },
+            //     series: [
+            //         {
+            //             name: '预期利息',
+            //             type: 'bar',
+            //             data: expectedData,
+            //             itemStyle: {
+            //                 color: '#5470C6'
+            //             },
+            //             emphasis: {
+            //                 focus: 'series'
+            //             }
+            //         },
+            //         {
+            //             name: '实际利息',
+            //             type: 'bar',
+            //             data: actualData,
+            //             itemStyle: {
+            //                 color: '#91CC75'
+            //             },
+            //             emphasis: {
+            //                 focus: 'series'
+            //             }
+            //         }
+            //     ],
+            //     dataZoom: [{
+            //         type: 'inside',
+            //         start: 0,
+            //         end: 100
+            //     }, {
+            //         start: 0,
+            //         end: 100
+            //     }]
+            // };
+            //
+            // myChart.setOption(option);
+            //
+            // // 窗口大小变化时重新调整图表大小
+            // window.addEventListener('resize', function() {
+            //     myChart.resize();
+            // });
+            // ---
+
+            // 曲线图
+            const option = {
+                title: {
+                    text: '预期利息 vs 实际利息',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        label: {
+                            backgroundColor: '#6a7985'
+                        }
+                    },
+                    formatter: function (params) {
+                        let result = params[0].name + '<br>';
+                        params.forEach(param => {
+                            result += `${param.seriesName}: ${param.value.toLocaleString()}<br>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ['预期利息', '实际利息'],
+                    top: 30
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: dates,
+                    axisLabel: {
+                        rotate: 30
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: function (value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                series: [
+                    {
+                        name: '预期利息',
+                        type: 'line',
+                        smooth: true,
+                        lineStyle: {
+                            width: 3,
+                            color: '#5470C6'
+                        },
+                        itemStyle: {
+                            color: '#5470C6'
+                        },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {
+                                    offset: 0,
+                                    color: 'rgba(84, 112, 198, 0.5)'
+                                },
+                                {
+                                    offset: 1,
+                                    color: 'rgba(84, 112, 198, 0.1)'
+                                }
+                            ])
+                        },
+                        emphasis: {
+                            focus: 'series'
+                        },
+                        data: expectedData
+                    },
+                    {
+                        name: '实际利息',
+                        type: 'line',
+                        smooth: true,
+                        lineStyle: {
+                            width: 3,
+                            color: '#91CC75'
+                        },
+                        itemStyle: {
+                            color: '#91CC75'
+                        },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {
+                                    offset: 0,
+                                    color: 'rgba(145, 204, 117, 0.5)'
+                                },
+                                {
+                                    offset: 1,
+                                    color: 'rgba(145, 204, 117, 0.1)'
+                                }
+                            ])
+                        },
+                        emphasis: {
+                            focus: 'series'
+                        },
+                        data: actualData
+                    }
+                ],
+                dataZoom: [{
+                    type: 'inside',
+                    start: 0,
+                    end: 100
+                }, {
+                    start: 0,
+                    end: 100
+                }]
+            };
+
+            myChart.setOption(option);
+            window.addEventListener('resize', function () {
+                myChart.resize();
+            });
+        }
+
+        // 发送消息
+        function sendMessage() {
+            const message = input.value.trim();
+            if (message && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                addMessage('ME', message, 'user');
+                input.value = '';
+            }
+        }
+
+        // 添加消息到聊天框
+        function addMessage(sender, text, type) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = type;
+            msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chat.appendChild(msgDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // 事件绑定
+        sendBtn.addEventListener('click', sendMessage);
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // 初始禁用按钮直到连接建立
+        sendBtn.disabled = true;
+    </script>
+  </body>
+</html>
